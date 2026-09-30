@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Launcher and helper for the leader / dev / QA team, installed via the agent-team plugin.
+#   team start            interactive leader session (Opus, xhigh effort, leader write-guard armed)
+#   team bg               same, as a background session (survives closing the terminal)
+#   team status           usage gate + board summary + open questions (no tokens used)
+#   team gate             just the usage gate
+#   team answer Q-001 "…" answer a question the leader asked you
+#   team accept T-007     accept a MERGED task (-> DONE)
+#   team comment T-007 "…"  leave a comment on a task for the leader
+#   team approve T-007    approve merging a high-risk task (leader will not merge it before)
+#   team digest           what happened in the last 24 h and what waits on you
+#   team promote          open a develop -> main PR for you to review and merge
+# Overrides: TEAM_LEADER_MODEL (default claude-opus-5-5), TEAM_LEADER_EFFORT (default xhigh; "max" for deepest).
+#
+# Run from anywhere inside the project you want the team to work on — this resolves the
+# project's root the same way the rest of the toolkit does (teamlib.repo_root: $TEAM_ROOT
+# override, else the enclosing git repo, worktree-aware), never from this script's own
+# location, since once installed as a plugin this file does not live inside your project.
+set -euo pipefail
+scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)"
+root="$(python3 -c "import sys; sys.path.insert(0, '$scripts'); import teamlib; print(teamlib.repo_root())")"
+model="${TEAM_LEADER_MODEL:-claude-opus-5-5}"
+effort="${TEAM_LEADER_EFFORT:-xhigh}"
+cmd="${1:-help}"; shift || true
+board() { python3 "$scripts/board.py" --as human "$@"; }
+
+case "$cmd" in
+  start)  cd "$root"; TEAM_ROLE=leader exec claude --model "$model" --effort "$effort" "$@" ;;
+  bg)     cd "$root"; TEAM_ROLE=leader exec claude --bg --model "$model" --effort "$effort" "${@:-Session start. Follow your initialPrompt.}" ;;
+  status) cd "$root"; python3 "$scripts/usage_gate.py" || true; echo; board summary; echo; board questions ;;
+  gate)   cd "$root"; python3 "$scripts/usage_gate.py" ;;
+  answer) cd "$root"; board answer "$1" "$2" ;;
+  accept) cd "$root"; board status "$1" DONE --note "accepted by owner" ;;
+  comment) cd "$root"; board comment "$1" "$2" ;;
+  approve) cd "$root"; board approve "$1" ;;
+  digest) cd "$root"; board digest "$@" ;;
+  promote) cd "$root"; gh pr create --base main --head develop --title "Promote develop to main" --body "Owner-reviewed promotion of accepted work. See .team/README.md (tasks in DONE)." ;;
+  *) sed -n '2,13p' "${BASH_SOURCE[0]}" ;;
+esac
