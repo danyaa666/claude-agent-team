@@ -151,6 +151,7 @@ skills/team-tick             30-min heartbeat (gate -> cycle.md)
 skills/team-status           gate + board summary (no model work needed)
 skills/leader-planning       intake, decisions, task template, roadmap, stability check, health sweeps
 skills/leader-review         review + merge procedure
+skills/product-discovery     pre-planning: business/market/behavior research -> vision -> mockup sketch
 skills/{dev,qa}-workflow     wake-up procedures (preloaded into the agents)
 scripts/                     board.py usage_gate.py statusline.py guard.py worktree.py teamlib.py + tests
 bin/team                     launcher and owner shortcuts (resolves the *installing* project's
@@ -188,7 +189,7 @@ tests (board rules, gate maths, hook decisions, worktrees against a real git rem
 
 Verified here: `claude plugin validate` passes on both the plugin and a local test marketplace
 built from it; a real `claude plugin marketplace add` + `claude plugin install` round-trip
-succeeded, and `claude plugin details agent-team` confirmed Claude Code loaded all 7 skills,
+succeeded, and `claude plugin details agent-team` confirmed Claude Code loaded all 8 skills,
 3 agents, and the `PreToolUse` hook from the installed plugin; 34 unit tests pass.
 **Not yet** exercised end-to-end from an *installed* (not vendored) copy: a full tick that
 dispatches dev and qa in a second project, the statusLine cache filling once wired into that
