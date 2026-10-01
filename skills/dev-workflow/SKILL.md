@@ -36,8 +36,11 @@ answer "no work" and stop. Never take more than 2 tasks in one wake-up — `clai
    architecture; smallest change that satisfies the AC; no drive-by refactors; no secrets, no debug leftovers, no new dependency
    without noting it in the PR. Handle errors and validate inputs at the boundary.
 5. **Tests — carefully**: for every AC at least one test that fails without your change; edge cases (empty, max, invalid, concurrent);
-   for bugs a regression test written first. Then run build, full test suite, lint/format from the project commands
-   (`(cd $WT && <cmd>)`). Everything green before you continue. Flaky test → fix or report it, never ignore it.
+   for bugs a regression test written first. **New or changed HTTP endpoint** → also add/update that epic's Postman collection
+   (`postman/<epic>.postman_collection.json`) per `postman-collections.md` next to this file: full flow + edge-case folder,
+   folder-level pre-request script for any auto-variable a multi-step flow needs to stay consistent across its own requests.
+   Then run build, full test suite, lint/format from the project commands (`(cd $WT && <cmd>)`); `newman run postman/...` too if
+   it's wired up. Everything green before you continue. Flaky test → fix or report it, never ignore it.
 6. **Self-review like a hostile reviewer**: read `git -C $WT diff origin/develop...HEAD` top to bottom. Check AC coverage, security
    (injection, authz, secrets, unsafe deserialisation), performance (N+1, unbounded loops/queries), error paths, naming, docs,
    leftover TODOs. Fix what you find.

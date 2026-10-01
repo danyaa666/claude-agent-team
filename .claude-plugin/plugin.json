@@ -1,7 +1,7 @@
 {
   "name": "agent-team",
   "displayName": "Claude Agent Team",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A leader (Opus, xhigh effort) plans and reviews; a dev and a QA (Sonnet, high effort) implement and test. They wake on a 30-minute heartbeat, work only while your plan usage is under budget, and coordinate through one file in your repo, .team/README.md.",
   "author": { "name": "hongdangcs" },
   "keywords": ["agents", "team", "workflow", "project-management", "autonomous"]

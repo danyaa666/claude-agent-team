@@ -27,6 +27,11 @@ At most 2 tasks per wake-up (`claim` enforces it).
    `pull_request_read`). Red CI on the PR head is an automatic `QA_FAIL`.
 4. **Mechanical checks** (commands from README §5 / `.team/config.json`): build, full test suite, lint/format — `(cd <wt> && <cmd>)`.
    Run flaky-looking failures up to 2 more times; a test that passes only sometimes is a finding, not a pass.
+   **New or changed HTTP endpoint**: the epic's `postman/<epic>.postman_collection.json` must exist and cover it (full flow +
+   an edge-case entry for this change) per `dev-workflow/postman-collections.md` — missing or stale is a finding, same as a
+   missing unit test. Run it twice back to back (`newman run postman/<epic>.postman_collection.json -e ...`, or the Postman
+   app if `newman` isn't wired up) — the second run failing on a uniqueness conflict means the auto-variable is scoped wrong
+   (should be a folder-level pre-request script, not a one-off literal).
 5. **Acceptance testing** — build a short test-case table yourself, then execute it:
    - every AC, happy path; - boundaries and invalid input; - error handling and failure modes;
    - security basics relevant to the change (authn/authz, injection, secrets in logs, unsafe defaults);

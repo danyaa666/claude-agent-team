@@ -40,6 +40,8 @@ Data / state (if any): `erDiagram` or `stateDiagram-v2`.
 <authz rules, sensitive data, expected load, indexes, limits>
 
 #### Test plan
-- Dev: unit tests for <…>; integration test for <…>.
-- QA should probe: <edge cases, abuse cases, performance sanity>.
+- Dev: unit tests for <…>; integration test for <…>. New/changed HTTP endpoint → add/update
+  `postman/<epic>.postman_collection.json` (full flow + edge cases; see `dev-workflow/postman-collections.md`).
+- QA should probe: <edge cases, abuse cases, performance sanity>; for an API change, run the epic's Postman
+  collection twice back to back (auto-variable collisions on the second run are a finding).
 ```
