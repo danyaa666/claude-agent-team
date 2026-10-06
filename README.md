@@ -9,23 +9,25 @@ and troubleshooting.
 ## Install (once per machine)
 
 ```bash
-git clone <this-repo-url> ~/claude-agent-team   # or wherever you keep it
-claude plugin marketplace add ~/claude-agent-team
-claude plugin install agent-team@$(basename ~/claude-agent-team)
+git clone https://github.com/danyaa666/claude-agent-team.git
+claude plugin marketplace add ./claude-agent-team
+claude plugin install agent-team@claude-agent-team
 ```
 
-(`claude plugin marketplace add` reads this repo's `.claude-plugin/marketplace.json` — a
-single-plugin marketplace pointing at itself — so no separate marketplace repo is needed. If
-you clone under a different folder name, replace the name after `@` with whatever
-`.claude-plugin/marketplace.json`'s top-level `name` says, or just run
-`claude plugin marketplace list` to check.)
+This repo is itself a single-plugin marketplace (`.claude-plugin/marketplace.json`, named
+`claude-agent-team`), so no separate marketplace repo is needed. The name after `@` is that
+marketplace `name`, not your clone's folder name — it's `claude-agent-team` wherever you put the
+clone. Run `claude plugin marketplace list` if you're unsure what's registered.
 
 Verify:
 
 ```bash
-claude plugin list             # agent-team@<marketplace>  ...  Status: enabled
+claude plugin list             # agent-team@claude-agent-team  ...  Status: enabled
 claude plugin details agent-team
 ```
+
+To update after pulling new commits: `claude plugin marketplace update claude-agent-team &&
+claude plugin update agent-team`, then restart your session.
 
 `Status: enabled`, `scope: user` means it's now available in **every** project on this
 machine — installing once covers all your repos.

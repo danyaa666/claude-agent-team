@@ -187,10 +187,12 @@ tests (board rules, gate maths, hook decisions, worktrees against a real git rem
 
 ## 9. Verification status and troubleshooting
 
-Verified here: `claude plugin validate` passes on both the plugin and a local test marketplace
-built from it; a real `claude plugin marketplace add` + `claude plugin install` round-trip
-succeeded, and `claude plugin details agent-team` confirmed Claude Code loaded all 8 skills,
-3 agents, and the `PreToolUse` hook from the installed plugin; 34 unit tests pass.
+Verified here: `claude plugin validate` passes on the plugin and on this repo's own
+`.claude-plugin/marketplace.json`; a real `claude plugin marketplace add ./claude-agent-team` +
+`claude plugin install agent-team@claude-agent-team` round-trip succeeded from a *fresh, empty*
+config dir (`CLAUDE_CONFIG_DIR=$(mktemp -d)`, so nothing already installed could mask a missing
+file), and `claude plugin details agent-team` confirmed Claude Code loaded all 8 skills, 3
+agents, and the `PreToolUse` hook; 34 unit tests pass.
 **Not yet** exercised end-to-end from an *installed* (not vendored) copy: a full tick that
 dispatches dev and qa in a second project, the statusLine cache filling once wired into that
 project's own `settings.json`, `--bg` hosting. Do a dry run with one small task first and watch

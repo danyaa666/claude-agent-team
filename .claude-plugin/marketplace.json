@@ -1,0 +1,12 @@
+{
+  "name": "claude-agent-team",
+  "owner": { "name": "hongdangcs" },
+  "description": "Leader/dev/QA autonomous agent team for Claude Code — a single-plugin marketplace, so cloning this repo is enough to install it.",
+  "plugins": [
+    {
+      "name": "agent-team",
+      "source": "./",
+      "description": "Leader/dev/QA autonomous team for Claude Code."
+    }
+  ]
+}
