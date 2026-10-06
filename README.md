@@ -9,10 +9,12 @@ and troubleshooting.
 ## Install (once per machine)
 
 ```bash
-git clone https://github.com/danyaa666/claude-agent-team.git
-claude plugin marketplace add ./claude-agent-team
+claude plugin marketplace add danyaa666/claude-agent-team
 claude plugin install agent-team@claude-agent-team
 ```
+
+Or from a local clone (e.g. to hack on it): `git clone https://github.com/danyaa666/claude-agent-team.git`
+then `claude plugin marketplace add ./claude-agent-team` and the same `install` line.
 
 This repo is itself a single-plugin marketplace (`.claude-plugin/marketplace.json`, named
 `claude-agent-team`), so no separate marketplace repo is needed. The name after `@` is that
