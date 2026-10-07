@@ -49,6 +49,9 @@ _(tech-stack choices with the options considered and why; links to `docs/`.)_
 
 ## 6. Tasks
 
+Tasks live per epic, in `.team/epics/<epic>/tasks.md` next to that epic's `PRD.md` (created by `board.py add-task --epic <epic>`;
+`board.py epics` lists them). The region below holds only unfiled tasks — one-offs and bugs created without `--epic`.
+
 Task block anatomy (leader-written; dev/qa touch only `Status`, `Branch`, `PR`, and the Comments list):
 
 ```text

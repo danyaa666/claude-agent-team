@@ -29,7 +29,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import teamlib as tl  # noqa: E402
 
 WRITE_TOOLS = {"Edit", "Write", "NotebookEdit", "MultiEdit"}
-PROTECTED = re.compile(r"\.team/(README\.md|config\.json|state)")
+PROTECTED = re.compile(r"\.team/(README\.md|config\.json|state|epics)")
+# A real board.py *invocation* (`python3 [flags] [dir/]board.py`, or the script run directly after
+# ^ ; & |). A bare mention — `grep x scripts/board.py`, `cat board.py` — is not a call and needs no --as.
+BOARD_CALL = re.compile(r"""(?:\bpython3?\s+(?:-\S+\s+)*|(?:^|[;&|]\s*))["']?(?:\S*/)?board\.py\b""")
 WRITEY = re.compile(r"(>|\bsed\s+-[a-z]*i|\btee\b|\bmv\b|\bcp\b|\brm\b|\btruncate\b|\bdd\b|"
                     r"\bperl\s+-[a-z]*i|\bpython3?\b|\bnode\b|\bruby\b|\bawk\s+-i|\binstall\b|\bgit\s+(checkout|restore|apply))")
 MERGE_TOOL = re.compile(r"mcp__.*(merge_pull_request|enable_pr_auto_merge|create_or_update_file|push_files|"
@@ -92,7 +95,7 @@ def check_write(role, path, cfg, root, cwd):
         deny("%s may only edit inside its task worktree (.team/worktrees/<TASK>/), not %s. "
              "Create one with: python3 %s ensure <TASK-ID>" % (role, rel, worktree_py))
     inner = rel.split("/", 3)[-1] if rel.count("/") >= 3 else rel
-    if re.search(r"(^|/)\.team/(README\.md|config\.json|state)", inner):
+    if re.search(r"(^|/)\.team/(README\.md|config\.json|state|epics)", inner):
         deny("%s must not edit the board inside a worktree; use board.py" % role)
     if role == "qa":
         if not any(glob_match(inner, g) for g in cfg["guard"]["qa_write_globs"]):
@@ -101,7 +104,7 @@ def check_write(role, path, cfg, root, cwd):
 
 
 def check_bash(role, cmd):
-    board = re.search(r"board\.py", cmd)
+    board = BOARD_CALL.search(cmd)
     if board:
         m = re.search(r"--as[ =]+(\w+)", cmd)
         if not m:

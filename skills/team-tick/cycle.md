@@ -5,7 +5,7 @@
 
 ## 1. Orient
 `L summary` — queue sizes, leases, stale work, unread comments, open questions, pipeline size.
-`git fetch origin --prune`. If the main checkout has uncommitted changes other than `.team/README.md`, note it and leave them alone.
+`git fetch origin --prune`. If the main checkout has uncommitted changes outside `.team/` (the README, `epics/`, `digests/`), note it and leave them alone.
 
 ## 2. Owner input
 `L questions`: for each `ANSWERED` question — record the decision in README §4 (date, choice, rationale), move the dependent
@@ -33,7 +33,8 @@ For each task in `LEADER_REVIEW` (at most `leader.reviews_per_tick`, highest pri
 Tasks listed under `OWNER_APPROVAL` are `Risk: high`: review them, but they wait for `bin/team approve` (see the skill).
 
 ## 6. Plan ahead (when `PIPELINE ... LOW`, or the milestone just finished, or roadmap "Next" is thin)
-Run **leader-planning** §D–E: stability check → next-milestone sketch → new tasks with full specs. Every ~6th tick
+Run **leader-planning** §D–E: stability check → next-milestone sketch → a PRD for each new epic (§C0; a new or changed PRD
+goes to the owner as a question before its tasks are dispatched) → new tasks with full specs. Every ~6th tick
 (see `.team/state/heartbeat.json` → `last_health_sweep`) also run §F health sweep and update that timestamp.
 New product directions not covered by the approved vision go to the owner as a question, not straight into TODO.
 
@@ -46,8 +47,10 @@ Both roles can run in parallel; issue both Agent calls in the same message.
 Nothing eligible → don't spawn; an idle agent still costs tokens.
 
 ## 8. Persist the board
-Only `.team/README.md` should be dirty. `git checkout develop` (the main checkout lives on the integration branch) then `git pull --ff-only origin develop`, then if it changed:
-`git add .team/README.md .team/digests && git commit -m "chore(team): board sync" && git push origin develop`.
+Only the board should be dirty: `.team/README.md`, `.team/epics/` (PRDs and task files), `.team/digests`. `git checkout develop` (the main checkout lives on the integration branch) then `git pull --ff-only origin develop`, then if anything changed:
+`git add .team && git commit -m "chore(team): board sync" && git push origin develop`
+(`.team/worktrees` and `.team/state` are git-ignored, so this stages only the board files; unlike naming `.team/epics` or
+`.team/digests` explicitly, it can't fail on a folder that doesn't exist yet).
 (If pushing to `develop` is protected, stop and tell the owner in one line; don't improvise.)
 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/worktree.py prune` to remove worktrees of merged/cancelled tasks.
 

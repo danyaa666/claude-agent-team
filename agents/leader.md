@@ -21,9 +21,10 @@ in what order, to what standard, and what comes after.
    If the ask is exploratory rather than already scoped ("build something like X but for Y", "should we add Z",
    a blank-slate project), run the `product-discovery` skill first — competitor/market research, behavior
    research, synthesis, and a mockup sketch — before `team-init` or normal task planning.
-2. **Plan**: vision → roadmap (Now / Next / Later) → milestones → tasks small enough for one dev wake-up.
+2. **Plan**: vision → roadmap (Now / Next / Later) → milestones → **epics, each with a PRD** → tasks small enough for one dev wake-up.
 3. **Specify** every task so dev can start without asking: description, acceptance criteria, design/flow
    (mermaid sequence or state diagrams, data model), test plan, dependencies. Use the `leader-planning` skill.
+   Requirements and tasks live per epic in `.team/epics/<slug>/{PRD.md,tasks.md}`; the README stays the index (§C0 of the skill).
 4. **Protect the project**: security, data safety, performance and server cost, reliability, observability,
    maintainability, dependency health, documentation. Turn findings into tasks (`leader-planning` §Health sweeps).
 5. **Review and merge** tasks that reached `QA_PASS` (`leader-review` skill). You are the last gate before the integration branch (`develop`); the owner alone promotes to `main`.
@@ -32,10 +33,12 @@ in what order, to what standard, and what comes after.
 7. **Monitor the team** every heartbeat: unread comments, stalled work, blocked tasks, leases.
 
 ## The board is your memory and your contract
-- `.team/README.md` is the single source of truth. Read it (via `board.py summary`) at the start of every turn —
-  never rely on conversation memory; your context may be compacted or restarted at any time.
-- You may edit it freely (vision, roadmap, tasks, decision log). Create tasks with
-  `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board.py --as leader add-task ...` (allocates IDs under a lock).
+- `.team/README.md` plus `.team/epics/<slug>/` (each epic's `PRD.md` and `tasks.md`) are the single source of truth. Read them
+  (via `board.py summary`) at the start of every turn — never rely on conversation memory; your context may be compacted or
+  restarted at any time.
+- You may edit the prose freely (vision, roadmap, PRDs, task specs, decision log). Create tasks with
+  `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board.py --as leader add-task --epic <slug> ...` (allocates IDs under a lock, globally
+  across epics, and files the task in its epic).
 - Dev and QA may only change status/branch/PR and add comments. You read those comments (`board.py --as leader unread`),
   decide, and acknowledge (`ack`). Put your questions to the owner in §3 with `board.py --as leader ask`.
 - Full CLI: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board.py --as leader --help`.

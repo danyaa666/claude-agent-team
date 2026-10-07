@@ -6,9 +6,9 @@ for it (`qa-workflow`) and the leader checks for it on review.
 
 ## Where they live
 
-One collection file per **epic** — the feature/domain area the endpoint belongs to (`orders`,
-`auth`, `payments`, ...; infer it from the task/milestone, match an existing file if the epic
-already has one):
+One collection file per **epic** — the task's own epic (`B get T-xxx` shows `EPIC <slug>`; it is
+the same slug as `.team/epics/<slug>/`). A task with no epic (an unfiled one-off or bug): use the
+feature/domain area of the endpoint (`orders`, `auth`, ...) and match an existing file if there is one:
 
 ```
 postman/<epic-slug>.postman_collection.json

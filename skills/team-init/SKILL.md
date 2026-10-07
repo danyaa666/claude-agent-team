@@ -17,8 +17,11 @@ description: One-time project onboarding for the leader - read the repo and docs
    §4 decisions so far, §5 real build/test/lint commands.
 4. **Config**: set `project_name`, `main_branch`, `integration_branch`, and `commands.build|test|lint` in `.team/config.json` (Edit tool; the guard allows `.team/**`).
    Ensure `.gitignore` contains `.team/worktrees/`, `.team/state/`, `.claude/settings.local.json`.
-5. **Tasks**: create 6–10 tasks for M0–M1 via `L add-task` using `leader-planning/task-template.md` (real acceptance criteria, diagrams
-   where they remove ambiguity, dependencies only when truly needed). Put later work in `BACKLOG`.
+5. **Epics, PRDs, tasks** (`leader-planning` §C0): split M0–M1 into epics (one user-visible capability each). For each epic write
+   `.team/epics/<slug>/PRD.md` from `leader-planning/prd-template.md` and show the owner a short summary of each before dispatching.
+   Then create 6–10 tasks via `L add-task --epic <slug>` using `leader-planning/task-template.md` (real acceptance criteria citing the
+   PRD's R-ids, diagrams where they remove ambiguity, dependencies only when truly needed). Put later work in `BACKLOG`.
+   The README keeps the vision, roadmap (naming the epics under each milestone) and decisions — not the PRDs or task bodies.
 6. **Verify the machinery**:
    - `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/usage_gate.py --json` — if it says "usage unknown", the statusLine cache is not filling yet: it needs a
      Claude Pro/Max login, a trusted workspace, and one API response after the session starts. Tell the owner what to check

@@ -243,6 +243,72 @@ class BoardTests(unittest.TestCase):
         for i in range(8):
             self.assertIn("· dev · c%d" % i, text)
 
+    # ---- epics: per-epic tasks.md + PRD.md next to the README board
+    def epic_path(self, slug, name="tasks.md"):
+        return os.path.join(self.root, ".team", "epics", slug, name)
+
+    def readme(self):
+        return read(os.path.join(self.root, ".team", "README.md"))
+
+    def test_epic_tasks_live_in_their_own_file_with_global_ids(self):
+        t1 = self.add("Sign up", epic="auth")
+        t2 = self.add("Unfiled")                      # no epic: stays in the README's own region
+        t3 = self.add("Charge card", epic="payments")
+        self.assertEqual((t1, t2, t3), ("T-001", "T-002", "T-003"))   # ids are global, not per epic
+        self.assertIn("### T-001 — Sign up", read(self.epic_path("auth")))
+        self.assertIn("### T-003 — Charge card", read(self.epic_path("payments")))
+        readme = self.readme()
+        self.assertIn("### T-002 — Unfiled", readme)
+        self.assertNotIn("### T-001", readme)         # the whole point: tasks are out of the README
+        self.assertTrue(os.path.exists(self.epic_path("auth", "PRD.md")))     # stub so the PRD pointer never dangles
+        lines = {ln.split()[0]: ln for ln in run_board("leader", "list")[1].splitlines()}
+        self.assertIn("epic:auth", lines["T-001"])
+        self.assertIn("epic:payments", lines["T-003"])
+        self.assertNotIn("epic:", lines["T-002"])
+
+    def test_status_changes_are_written_to_the_epic_file_not_the_readme(self):
+        tid = self.add("Sign up", epic="auth")
+        self.assertEqual(run_board("dev", "claim", tid)[0], 0)
+        self.assertIn("**Status:** IN_PROGRESS", read(self.epic_path("auth")))
+        readme = self.readme()
+        self.assertNotIn(tid, readme.split("<!-- summary:end -->")[1])           # no task block in the README...
+        self.assertIn("IN_PROGRESS | 1 | T-001", readme)                          # ...but its summary still counts it
+        self.assertIn("**Epics (done/total):** auth 0/1", readme)
+
+    def test_get_points_dev_and_qa_at_the_epics_prd(self):
+        tid = self.add("Sign up", epic="auth")
+        out = run_board("dev", "get", tid)[1]
+        self.assertIn("EPIC auth — PRD: .team/epics/auth/PRD.md", out)
+        self.assertIn("### T-001 — Sign up", out)
+        self.assertNotIn("EPIC", run_board("dev", "get", self.add("Plain"))[1])  # unfiled tasks: unchanged output
+
+    def test_leader_can_move_a_task_between_epic_and_readme(self):
+        tid = self.add("Sign up")
+        self.assertEqual(run_board("leader", "set", tid, "epic=auth")[0], 0)
+        self.assertIn("### T-001", read(self.epic_path("auth")))
+        self.assertNotIn("### T-001", self.readme().split("<!-- summary:end -->")[1])
+        self.assertEqual(run_board("leader", "set", tid, "epic=-")[0], 0)           # '-' = back to unfiled
+        self.assertIn("### T-001", self.readme())
+        self.assertNotIn("### T-001", read(self.epic_path("auth")))
+        self.assertEqual(run_board("dev", "claim", tid)[0], 0)                       # dev owns it now, so only the key is at issue
+        code, _, err = run_board("dev", "set", tid, "epic=auth")
+        self.assertEqual(code, 2)
+        self.assertIn("not settable by dev", err)                                    # only the leader files tasks
+
+    def test_bad_epic_slug_is_rejected_and_writes_nothing(self):
+        code, _, err = run_board("leader", "add-task", "--title", "x", "--epic", "../evil", "--body", "b")
+        self.assertEqual(code, 2)
+        self.assertIn("bad epic slug", err)
+        self.assertFalse(os.path.exists(os.path.join(self.root, ".team", "epics")))
+
+    def test_epics_command_and_roundtrip_stability(self):
+        self.add("Sign up", epic="auth")
+        out = run_board("leader", "epics")[1]
+        self.assertIn("EPIC auth tasks=1 done=0 prd=yes", out)
+        text = read(self.epic_path("auth"))
+        board = bd.Board(self.readme(), {"auth": text})
+        self.assertEqual(board.render_epic("auth"), text)        # parse -> render is lossless
+
 
 class GateTests(unittest.TestCase):
     cfg = tl.load_config("/nonexistent")
@@ -367,6 +433,26 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(self.call("Bash", {"command": ok.replace("--as dev", "--as leader")}, "dev"), 2)
         self.assertEqual(self.call("Bash", {"command": "python3 x/board.py get T-001"}, "dev"), 2)
         self.assertEqual(self.call("Bash", {"command": ok.replace("--as dev", "--as qa")}, "qa"), 0)
+
+    def test_only_a_real_board_call_needs_as_not_a_mere_mention(self):
+        # Reading or grepping the script is not invoking it; this used to be blocked for every role.
+        self.assertEqual(self.call("Bash", {"command": "grep -n def scripts/board.py"}, "dev"), 0)
+        self.assertEqual(self.call("Bash", {"command": "cat scripts/board.py | head"}, "qa"), 0)
+        self.assertEqual(self.call("Bash", {"command": "wc -l scripts/board.py"}, None, "leader"), 0)
+        # ...while genuine invocations (any spelling) are still policed.
+        self.assertEqual(self.call("Bash", {"command": "python3 scripts/board.py get T-001"}, "dev"), 2)
+        self.assertEqual(self.call("Bash", {"command": "cd x && python3 -u \"/p/q/board.py\" get T-001"}, "dev"), 2)
+        self.assertEqual(self.call("Bash", {"command": "./scripts/board.py get T-001"}, "dev"), 2)
+        self.assertEqual(self.call("Bash", {"command": "./scripts/board.py --as dev get T-001"}, "dev"), 0)
+        self.assertEqual(self.call("Bash", {"command": "python3 scripts/board.py --as leader get T-001"}, "dev"), 2)
+
+    def test_epic_files_are_board_state_dev_and_qa_cannot_touch(self):
+        self.assertEqual(self.call("Bash", {"command": "sed -i s/TODO/DONE/ .team/epics/auth/tasks.md"}, "dev"), 2)
+        self.assertEqual(self.call("Bash", {"command": "cat .team/epics/auth/PRD.md"}, "dev"), 0)   # reading is fine
+        self.assertEqual(self.call("Write", {"file_path": self.wt(".team/epics/auth/tasks.md")}, "dev"), 2)
+        # the leader writes PRDs and task bodies: .team/** is in its write_globs
+        self.assertEqual(self.call("Write", {"file_path": os.path.join(self.root, ".team", "epics", "auth", "PRD.md")},
+                                   None, "leader"), 0)
 
     def test_shell_edits_of_board_are_blocked(self):
         self.assertEqual(self.call("Bash", {"command": "sed -i s/TODO/DONE/ .team/README.md"}, "dev"), 2)

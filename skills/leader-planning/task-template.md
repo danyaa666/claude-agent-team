@@ -3,15 +3,16 @@
 ```markdown
 #### Description
 <2–5 sentences: the problem, who benefits, where it fits in the milestone. Link docs/ADRs.>
+Epic: `<slug>` — satisfies PRD requirements R1, R3 (`.team/epics/<slug>/PRD.md` §5). <Created with `--epic <slug>`.>
 
 #### Scope
 - In: <bullets>
 - Out (do not do): <bullets>
 
 #### Acceptance criteria
-- [ ] AC1 — <testable statement, observable behaviour>
-- [ ] AC2 — <…>
-- [ ] AC3 — <error / edge behaviour>
+- [ ] AC1 — <testable statement, observable behaviour> (R1)
+- [ ] AC2 — <…> (R1)
+- [ ] AC3 — <error / edge behaviour> (R3)
 
 #### Design
 Files/modules to touch: `path/a`, `path/b`.

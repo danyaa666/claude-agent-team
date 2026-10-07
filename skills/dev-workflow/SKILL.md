@@ -26,7 +26,9 @@ answer "no work" and stop. Never take more than 2 tasks in one wake-up — `clai
 ## Step 2 — for each task
 1. **Claim**: `B claim T-xxx` (TODO/QA_FAIL/CHANGES_REQUESTED → IN_PROGRESS).
 2. **Read everything**: `B get T-xxx` — description, acceptance criteria (AC), design/diagram, test plan, and **all comments**
-   (on rework they list exactly what to fix). Read `.team/README.md` §5 for build/test/lint commands and conventions.
+   (on rework they list exactly what to fix). If it starts with an `EPIC <slug> — PRD: <path>` line, read that PRD too (from the
+   main checkout, read-only) — the AC cite its requirement ids, and it holds the goals, non-goals and edge cases behind them.
+   Read `.team/README.md` §5 for build/test/lint commands and conventions.
    Unclear or contradictory spec, too big for one wake-up, or needs a new dependency / technology / product decision →
    `B comment T-xxx "<specific question or proposal>"` then `B status T-xxx BLOCKED` and move on. Do not guess.
 3. **Worktree**: `WT=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/worktree.py ensure T-xxx)` — prints `.team/worktrees/T-xxx`

@@ -22,6 +22,8 @@ At most 2 tasks per wake-up (`claim` enforces it).
 ## Step 2 — for each task
 1. **Claim**: `B claim T-xxx` (READY_FOR_QA → IN_QA).
 2. **Understand the contract**: `B get T-xxx` — description, acceptance criteria (AC), design, test plan, dev's notes and earlier QA notes.
+   If it starts with an `EPIC <slug> — PRD: <path>` line, read the PRD too: its goals, non-goals and edge-case list are what to probe
+   beyond the AC (read-only; never edit it).
 3. **Get the code**: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/worktree.py ensure T-xxx` prints the worktree path; then
    `git -C <wt> pull --ff-only` (branch must equal the PR head). Also check the PR's CI status (`gh pr checks` or GitHub MCP
    `pull_request_read`). Red CI on the PR head is an automatic `QA_FAIL`.

@@ -3,9 +3,10 @@
 
     python3 scripts/board.py --as <leader|dev|qa|human> <command> ...
 
-The README is the single source of truth. Free-form text in it (vision, roadmap,
-task descriptions, designs) belongs to the leader and is never rewritten by this
-script. Dev/QA can only: change a task's Status along allowed transitions, set
+The board is the README plus, optionally, one tasks file per epic
+(.team/epics/<slug>/tasks.md, next to that epic's PRD.md); tasks may live in either. Free-form
+text (vision, roadmap, PRDs, task descriptions, designs) belongs to the leader and is never
+rewritten by this script. Dev/QA can only: change a task's Status along allowed transitions, set
 Branch/PR on their own task, and append comments. Every write is locked + atomic.
 Run `board.py --as leader --help` for the command list.
 """
@@ -85,6 +86,8 @@ COMMENTS_HEADING = "#### Comments"
 
 class Item:
     """A `### T-001 — title` (or Q-001) block: ordered meta list + opaque body."""
+
+    epic = ""  # slug of the epic file this task lives in; "" = the README's own (unfiled) tasks region
 
     def __init__(self, ident, title):
         self.id, self.title = ident, title
@@ -181,23 +184,91 @@ class Section:
             self.name, inner, "\n" if inner else "", self.name)
 
 
+EPIC_SLUG_RE = re.compile(r"[a-z0-9][a-z0-9-]*")
+EPIC_TASKS_TEMPLATE = """# Epic: {slug}
+
+PRD: [PRD.md](PRD.md) · Board index: [../../README.md](../../README.md)
+
+Task blocks for this epic. The leader writes them with `board.py add-task --epic {slug}`; status, branch,
+PR and comments change only through `board.py`.
+
+<!-- tasks:start -->
+
+<!-- tasks:end -->
+"""
+EPIC_PRD_STUB = """# PRD — {slug}
+
+_(leader: fill in from `leader-planning/prd-template.md` — problem, users, goals, non-goals,
+requirements, success metrics, open questions.)_
+"""
+
+
+def _split(text):
+    """Cut a file into plain-text parts and its <!-- tasks|questions:start --> sections."""
+    parts, sec, pos = [], {}, 0
+    for m in REGION_RE.finditer(text):
+        parts.append(text[pos:m.start()])
+        sec[m.group(2)] = Section(m.group(2), m.group(3))
+        parts.append(sec[m.group(2)])
+        pos = m.end()
+    parts.append(text[pos:])
+    return parts, sec
+
+
+def _join(parts):
+    return "".join(p if isinstance(p, str) else p.render() for p in parts)
+
+
 class Board:
-    def __init__(self, text):
-        self.parts, self.sec, pos = [], {}, 0
-        for m in REGION_RE.finditer(text):
-            self.parts.append(text[pos:m.start()])
-            sec = Section(m.group(2), m.group(3))
-            self.sec[m.group(2)] = sec
-            self.parts.append(sec)
-            pos = m.end()
-        self.parts.append(text[pos:])
+    """The README (questions, summary, unfiled tasks) plus one tasks file per epic.
+
+    `epics` maps slug -> the text of .team/epics/<slug>/tasks.md. A board with no epics behaves
+    exactly like the single-file board it replaces.
+    """
+
+    def __init__(self, text, epics=None):
+        self.parts, self.sec = _split(text)
         if "tasks" not in self.sec:
             raise BoardError("README has no <!-- tasks:start --> / <!-- tasks:end --> markers")
+        self.epic_orig = dict(epics or {})
+        self.epic_parts = {}
+        for slug, etext in sorted(self.epic_orig.items()):
+            self._load_epic(slug, etext)
         self.dirty = False
+
+    def _load_epic(self, slug, etext):
+        parts, sec = _split(etext)
+        if "tasks" not in sec:
+            raise BoardError("epic %s: tasks.md has no <!-- tasks:start --> / <!-- tasks:end --> markers" % slug)
+        for t in sec["tasks"].items:
+            t.epic = slug
+        self.epic_parts[slug] = (parts, sec["tasks"])
+
+    def epic_section(self, slug, create=False):
+        if slug not in self.epic_parts:
+            if not create:
+                raise BoardError("no such epic: %s" % slug, 4)
+            self._load_epic(slug, EPIC_TASKS_TEMPLATE.format(slug=slug))
+        return self.epic_parts[slug][1]
+
+    def move_task(self, task, slug):
+        """Move a task block into epic `slug` (or back to the README's unfiled region for '')."""
+        target = self.epic_section(slug, create=True) if slug else self.sec["tasks"]
+        for sec in [self.sec["tasks"]] + [s for _p, s in self.epic_parts.values()]:
+            if task in sec.items:
+                sec.items.remove(task)
+        target.items.append(task)
+        task.epic = slug
+
+    def render_epic(self, slug):
+        return _join(self.epic_parts[slug][0])
 
     @property
     def tasks(self):
-        return self.sec["tasks"].items
+        out = list(self.sec["tasks"].items)
+        for slug in sorted(self.epic_parts):
+            out += self.epic_parts[slug][1].items
+        return out
 
     @property
     def questions(self):
@@ -245,6 +316,18 @@ def q_state(q):
     return "ANSWERED" if q.get("Answer", PENDING) not in ("", PENDING, NONE, "pending") else "OPEN"
 
 
+def epic_counts(board):
+    """[(slug or '', done, total)] — epics sorted, the README's unfiled tasks last (if any)."""
+    rows = []
+    for slug in sorted(board.epic_parts):
+        items = board.epic_parts[slug][1].items
+        rows.append((slug, sum(t.get("Status") in ("MERGED", "DONE") for t in items), len(items)))
+    unfiled = board.sec["tasks"].items
+    if unfiled:
+        rows.append(("", sum(t.get("Status") in ("MERGED", "DONE") for t in unfiled), len(unfiled)))
+    return rows
+
+
 def summary_md(board):
     by_status = {}
     for t in board.tasks:
@@ -255,7 +338,10 @@ def summary_md(board):
             lines.append("| %s | %d | %s |" % (s, len(by_status[s]), ", ".join(by_status[s])))
     if not by_status:
         lines.append("| _no tasks yet_ | 0 | |")
-    merged = ["%s (%s)" % (t.id, t.title) for t in board.tasks if t.get("Status") == "MERGED"]
+    if board.epic_parts:
+        lines += ["", "**Epics (done/total):** " + "; ".join(
+            "%s %d/%d" % (name or "(unfiled)", done, total) for name, done, total in epic_counts(board))]
+    merged =["%s (%s)" % (t.id, t.title) for t in board.tasks if t.get("Status") == "MERGED"]
     openq = ["%s (%s)" % (q.id, q.title) for q in board.questions if q_state(q) != "RESOLVED"]
     lines += ["", "**Awaiting your review (MERGED):** " + ("; ".join(merged) or "nothing"),
               "", "**Open questions for you:** " + ("; ".join(openq) or "none"),
@@ -271,17 +357,47 @@ def locked(root, exclusive=True):
         yield
 
 
+def epics_dir(root):
+    return os.path.join(tl.team_dir(root), "epics")
+
+
+def epic_file(root, slug, name):
+    return os.path.join(epics_dir(root), slug, name)
+
+
+def load_epics(root):
+    out = {}
+    try:
+        names = sorted(os.listdir(epics_dir(root)))
+    except FileNotFoundError:
+        return out
+    for slug in names:
+        try:
+            with open(epic_file(root, slug, "tasks.md"), encoding="utf-8") as fh:
+                out[slug] = fh.read()
+        except (FileNotFoundError, NotADirectoryError):
+            continue  # a folder without tasks.md (e.g. a PRD still being drafted) is not an epic board yet
+    return out
+
+
 @contextlib.contextmanager
 def open_board(root, write=False):
     path = os.path.join(tl.team_dir(root), "README.md")
     with locked(root, exclusive=write):
         try:
             with open(path, encoding="utf-8") as fh:
-                board = Board(fh.read())
+                board = Board(fh.read(), load_epics(root))
         except FileNotFoundError:
             raise BoardError("no board at %s — run /team-init" % path)
         yield board
         if write and board.dirty:
+            # Epic files first, README last: the README summary is derived, so if we die between the
+            # two writes the next write regenerates it and nothing real is lost.
+            for slug in board.epic_parts:
+                text = board.render_epic(slug)
+                if text != board.epic_orig.get(slug):
+                    os.makedirs(os.path.dirname(epic_file(root, slug, "tasks.md")), exist_ok=True)
+                    tl.write_atomic(epic_file(root, slug, "tasks.md"), text)
             tl.write_atomic(path, board.render())
 
 
@@ -324,9 +440,10 @@ def fmt(t):
     deps_s = t.get("Depends-on")
     deps_s = "" if deps_s in ("", NONE) else " deps:%s" % deps_s.replace(" ", "")
     risk = " RISK:HIGH" if t.get("Risk", "low").lower() == "high" else ""
-    return "%s [%s] %s %s %s%s%s — %s" % (
+    epic = " epic:%s" % t.epic if t.epic else ""
+    return "%s [%s] %s %s %s%s%s%s — %s" % (
         t.id, t.get("Status"), t.get("Priority", "P2"), t.get("Type", "-"),
-        t.get("Milestone", "-"), deps_s, risk, t.title)
+        t.get("Milestone", "-"), epic, deps_s, risk, t.title)
 
 
 def prio_key(t):
@@ -450,7 +567,21 @@ def cmd_list(ctx, args):
 
 def cmd_get(ctx, args):
     with open_board(ctx.root) as b:
-        print(b.task(args.id).render().rstrip("\n"))
+        t = b.task(args.id)
+        if t.epic:  # tell dev/QA where the epic's requirements live; they read it from the main checkout
+            prd = os.path.relpath(epic_file(ctx.root, t.epic, "PRD.md"), ctx.root)
+            print("EPIC %s — PRD: %s%s\n" % (t.epic, prd, "" if os.path.exists(os.path.join(ctx.root, prd)) else " (missing)"))
+        print(t.render().rstrip("\n"))
+
+
+def cmd_epics(ctx, args):
+    with open_board(ctx.root) as b:
+        rows = epic_counts(b)
+        for slug, done, total in rows:
+            prd = "n/a" if not slug else ("yes" if os.path.exists(epic_file(ctx.root, slug, "PRD.md")) else "MISSING")
+            print("EPIC %s tasks=%d done=%d prd=%s" % (slug or "(unfiled)", total, done, prd))
+        if not rows:
+            print("(no tasks yet)")
 
 
 def cmd_summary(ctx, args):
@@ -460,7 +591,9 @@ def cmd_summary(ctx, args):
         for t in b.tasks:
             counts[t.get("Status")] = counts.get(t.get("Status"), 0) + 1
         print("TASKS " + (" ".join("%s=%d" % (s, counts[s]) for s in STATUS_ORDER if s in counts) or "none"))
-        ready_dev = [t for t in candidates(b, "dev", ctx.cfg)]
+        if b.epic_parts:
+            print("EPICS " + " ".join("%s(%d/%d)" % (n or "unfiled", d, tot) for n, d, tot in epic_counts(b)))
+        ready_dev =[t for t in candidates(b, "dev", ctx.cfg)]
         print("DEV_QUEUE %d (rework %d)" % (len(ready_dev), sum(
             1 for t in ready_dev if t.get("Status") != "TODO")))
         print("QA_QUEUE %d" % len(candidates(b, "qa")))
@@ -591,6 +724,12 @@ def cmd_set(ctx, args):
             if key.strip().lower() == "title" and ctx.role == "leader":
                 t.title = val.strip()
                 continue
+            if key.strip().lower() == "epic" and ctx.role == "leader":
+                slug = "" if val.strip() in ("", "-", NONE) else check_slug(val.strip())
+                b.move_task(t, slug)
+                if slug:
+                    ensure_prd(ctx.root, slug)
+                continue
             if norm is None or (ctx.role == "dev" and key.strip().lower() not in DEV_KEYS):
                 raise BoardError("key %r not settable by %s" % (key, ctx.role))
             t.set(norm, val.strip() or NONE)
@@ -599,13 +738,28 @@ def cmd_set(ctx, args):
         print("SET %s" % t.id)
 
 
+def check_slug(slug):
+    if not EPIC_SLUG_RE.fullmatch(slug):
+        raise BoardError("bad epic slug %r (lowercase letters, digits and '-', e.g. 'user-auth')" % slug)
+    return slug
+
+
+def ensure_prd(root, slug):
+    """Leave a PRD.md stub for the leader to fill in, so a task's 'PRD:' pointer never dangles."""
+    path = epic_file(root, slug, "PRD.md")
+    if not os.path.exists(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tl.write_atomic(path, EPIC_PRD_STUB.format(slug=slug))
+
+
 def cmd_add_task(ctx, args):
     require(ctx, "leader")
     body = read_text(args.body, args.body_file).strip("\n")
     if re.search(r"(?m)^###\s+[TQ]-\d+\s", body):
         raise BoardError("body must not contain '### T-xxx' headings")
+    epic = check_slug(args.epic) if args.epic else ""
     with open_board(ctx.root, write=True) as b:
-        nxt = max([int(t.id[2:]) for t in b.tasks] or [0]) + 1
+        nxt = max([int(t.id[2:]) for t in b.tasks] or [0]) + 1  # ids are global across all epics
         t = Item("T-%03d" % nxt, args.title.strip())
         t.meta = [["Status", args.status], ["Priority", args.priority], ["Type", args.type],
                   ["Milestone", args.milestone or NONE], ["Depends-on", args.depends or NONE],
@@ -615,9 +769,12 @@ def cmd_add_task(ctx, args):
         t.rest = body.split("\n") if body else []
         if COMMENTS_HEADING not in [ln.strip() for ln in t.rest]:
             t.rest += ["", COMMENTS_HEADING]
-        b.sec["tasks"].items.append(t)
+        (b.epic_section(epic, create=True) if epic else b.sec["tasks"]).items.append(t)
+        t.epic = epic
+        if epic:
+            ensure_prd(ctx.root, epic)
         b.dirty = True
-        print("ADDED %s" % t.id)
+        print("ADDED %s" % t.id)  # keep this line's shape: callers take the id from its last token
 
 
 def cmd_unread(ctx, args):
@@ -832,8 +989,9 @@ def build_parser():
     add("summary", cmd_summary, "queue sizes, leases, stale work, questions")
     sp = add("list", cmd_list, "one line per task")
     sp.add_argument("--status", nargs="*")
-    sp = add("get", cmd_get, "print one task block")
+    sp = add("get", cmd_get, "print one task block (plus where its epic's PRD lives)")
     sp.add_argument("id")
+    add("epics", cmd_epics, "one line per epic: task counts and whether its PRD exists")
     sp = add("next", cmd_next, "tasks you may pick now (dev/qa), with remaining capacity")
     sp.add_argument("--for", dest="for_role", choices=("dev", "qa"))
     sp.add_argument("--limit", type=int)
@@ -846,7 +1004,7 @@ def build_parser():
     sp = add("comment", cmd_comment, "append a comment ('-' reads stdin)")
     sp.add_argument("id")
     sp.add_argument("text")
-    sp = add("set", cmd_set, "set meta: dev may set branch=/pr=; leader any meta or title=")
+    sp = add("set", cmd_set, "set meta: dev may set branch=/pr=; leader any meta, title=, or epic=<slug|-> to move it")
     sp.add_argument("id")
     sp.add_argument("pairs", nargs="+")
     sp = add("add-task", cmd_add_task, "leader: create a task from a markdown body")
@@ -854,6 +1012,7 @@ def build_parser():
     sp.add_argument("--priority", default="P2", choices=list(PRIO))
     sp.add_argument("--type", default="feature")
     sp.add_argument("--milestone")
+    sp.add_argument("--epic", help="epic slug: the task goes in .team/epics/<slug>/tasks.md (created, with a PRD.md stub, if new)")
     sp.add_argument("--depends", help="e.g. 'T-001, T-002'")
     sp.add_argument("--status", default="TODO", choices=("TODO", "BACKLOG"))
     sp.add_argument("--risk", default="low", choices=("low", "high"),

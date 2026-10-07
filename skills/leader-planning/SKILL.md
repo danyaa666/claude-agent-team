@@ -6,12 +6,14 @@ description: Leader's planning playbook - intake of requirements, tech-stack dec
 # Leader planning playbook
 
 `L` = `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/board.py --as leader`. Templates live next to this file:
-`task-template.md` (task body), `decision-record.md` (owner decisions), `health-checklist.md` (sweeps).
+`prd-template.md` (an epic's PRD), `task-template.md` (task body), `decision-record.md` (owner decisions),
+`health-checklist.md` (sweeps).
 
 ## A. Intake — turn a request into a plan
 1. Restate the request in your words: goal, user, why now. List assumptions and open questions; ask the owner only what changes the plan.
 2. Check it against the vision (README §1) and roadmap (§2). Conflicts, hidden costs, security/privacy implications → say so plainly.
-3. Write or update: vision, milestone goal with **exit criteria** ("stable" = measurable), then tasks (§C). Note what you deliberately left out.
+3. Write or update: vision, milestone goal with **exit criteria** ("stable" = measurable), then the **epics and their PRDs** (§C0), then
+   tasks (§C). Note what you deliberately left out.
 4. Tell the owner the plan in ≤ 10 lines: milestone, task count, biggest risks, decisions you need.
 
 ## B. Tech-stack and other owner decisions
@@ -25,9 +27,31 @@ trade-offs, breaking public changes, new product directions. Protocol:
 3. On the answer: record it in README §4 (date, choice, rationale, rejected options), update `.team/config.json` → `commands` if build/test
    commands changed, unblock tasks, `L resolve Q-xxx`.
 
+## C0. Epics and PRDs — keep the README an index, not a dump
+The README holds what is true of the whole project: vision, roadmap, decisions, conventions, the owner's questions, the change log.
+Requirements and tasks live **per epic**, under `.team/epics/<slug>/`:
+```
+.team/epics/<slug>/PRD.md      what and why (use prd-template.md) — you write it
+.team/epics/<slug>/tasks.md    the task blocks (spec + status + comments) — created by `L add-task --epic <slug>`
+```
+- **An epic is one user-visible capability** (`auth`, `lessons`, `hsk-mock-exam`, `admin-content`), typically 3–12 tasks. Too small
+  (one task) → just a task; too big (a whole product area, 20+ tasks) → split it. Slug: lowercase letters, digits, `-`.
+- **Epic vs. milestone:** the epic says *what capability*; the milestone says *when / which stable slice*. A milestone usually cuts
+  across several epics (M1 = the thinnest slice of `auth` + `lessons` + `tests`), so both are on every task (`--epic`, `--milestone`).
+- **PRD first, then tasks.** Write the PRD (problem, goals/metrics, non-goals, flow, **numbered requirements**, edge cases, open
+  questions), then derive the tasks. Every *Must* requirement maps to at least one task; each task's acceptance criteria cite the
+  R-ids they satisfy. Owner decisions the PRD depends on go on the board (`L ask`), listed by id under the PRD's open questions.
+- **Owner approval:** a new or materially changed PRD is a product decision — show it to the owner (a short summary plus the path)
+  before dispatching its tasks, same as any other scope call; mark `Status: approved by owner` once they agree.
+- `L epics` lists every epic with its task counts and whether its PRD exists; `L set T-xx epic=<slug>` moves a task into an epic
+  (`epic=-` moves it back to the README's unfiled region, where tasks created without `--epic` live — fine for one-offs and bugs).
+- Dev and QA read the PRD for context (`B get T-xx` prints its path); they never edit it.
+- The epic slug is also the name of that epic's Postman collection (`postman/<slug>.postman_collection.json`).
+
 ## C. Writing a task dev can execute without asking
-Use `task-template.md`. Create: `L add-task --title "..." --priority P1 --type feature --milestone M1 --depends "T-003" --body-file /tmp/body.md`
-(or `--body "..."`). Rules:
+Use `task-template.md`. Create: `L add-task --epic auth --title "..." --priority P1 --type feature --milestone M1 --depends "T-003" --body-file /tmp/body.md`
+(or `--body "..."`; omit `--epic` only for a one-off or a bug). The first task of a new epic creates its `tasks.md` and a PRD stub — replace
+the stub with the real PRD before dispatching. Rules:
 - **Sized for one dev wake-up** (roughly ≤ ½ day of work, ≤ ~400 changed lines, one PR, one concern). Bigger → split by vertical slice.
 - **Acceptance criteria are testable statements** ("returns 404 with error code X for an unknown id"), 3–8 of them.
 - **Design**: include the diagram that removes ambiguity — mermaid `sequenceDiagram` for interactions, `stateDiagram-v2` for lifecycles,

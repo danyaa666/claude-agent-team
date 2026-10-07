@@ -1,7 +1,7 @@
 # Leader / Dev / QA agent team for Claude Code
 
 A leader on **Opus 5.5 (xhigh effort)** plans and reviews; a **dev** and a **QA** on **Sonnet 5.5 (high effort)** implement and test.
-They wake every 30 minutes, work only while your plan usage is under the limits, and coordinate through one file: `.team/README.md`.
+They wake every 30 minutes, work only while your plan usage is under the limits, and coordinate through the board in `.team/`: `README.md` as the index, plus a `PRD.md` and `tasks.md` per epic.
 
 ## 1. Is it possible? Requirement by requirement
 
@@ -160,12 +160,23 @@ bin/team                     launcher and owner shortcuts (resolves the *install
 
 Per installing project (created by `/team-init`, not shipped by the plugin):
 ```
-.team/README.md               the board (source of truth)      .team/config.json  limits, WIP, commands
+.team/README.md               the board index: vision, roadmap, decisions, owner questions, status summary
+.team/config.json             limits, WIP, commands
+.team/epics/<epic>/PRD.md     what and why for one epic (leader-written, from leader-planning/prd-template.md)
+.team/epics/<epic>/tasks.md   that epic's task blocks: spec, status, comments (status changes only via board.py)
 .team/state/, .team/worktrees/  runtime (git-ignored): leases, heartbeat, one worktree per task
 ```
 
-`python3 -m unittest discover -s scripts/tests -v` (from this plugin's own repo root) runs 34
-tests (board rules, gate maths, hook decisions, worktrees against a real git remote).
+**Epics are optional and additive.** A board is the README plus every `epics/*/tasks.md`; task ids are global
+across all of them, and tasks created without `--epic` stay in the README's own region, so an existing
+single-file board keeps working untouched (`board.py set T-xx epic=<slug>` migrates a task). Every write goes
+through the same exclusive lock; the epic files are written first and the README (whose status summary is
+derived) last, so an interrupted write can leave a stale summary but never a lost task. The guard treats
+`.team/epics/` like the README: dev/QA can read it but only the leader (through `board.py` or direct edits)
+changes it.
+
+`python3 -m unittest discover -s scripts/tests -v` (from this plugin's own repo root) runs 42
+tests (board rules incl. epics, gate maths, hook decisions, worktrees against a real git remote).
 
 ## 7. Safety valves added to the flow
 
@@ -192,7 +203,7 @@ Verified here: `claude plugin validate` passes on the plugin and on this repo's 
 `claude plugin install agent-team@claude-agent-team` round-trip succeeded from a *fresh, empty*
 config dir (`CLAUDE_CONFIG_DIR=$(mktemp -d)`, so nothing already installed could mask a missing
 file), and `claude plugin details agent-team` confirmed Claude Code loaded all 8 skills, 3
-agents, and the `PreToolUse` hook; 34 unit tests pass.
+agents, and the `PreToolUse` hook; 42 unit tests pass.
 **Not yet** exercised end-to-end from an *installed* (not vendored) copy: a full tick that
 dispatches dev and qa in a second project, the statusLine cache filling once wired into that
 project's own `settings.json`, `--bg` hosting. Do a dry run with one small task first and watch

@@ -99,7 +99,7 @@ Convenience launcher (optional): put this repo's `bin/` on your `PATH`, then use
 ## Developing this plugin itself
 
 ```bash
-python3 -m unittest discover -s scripts/tests -v   # 34 tests
+python3 -m unittest discover -s scripts/tests -v   # 42 tests
 claude plugin validate .                            # schema check
 ```
 
